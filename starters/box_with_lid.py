@@ -62,7 +62,7 @@ def build(p: Params):
         # small chamfer on the lip so it finds the opening
         try:
             lip_top = lid.faces().sort_by(Axis.Z)[-1]
-            chamfer(lip_top.outer_wire().edges(), length=min(0.6, p.lip / 3))
+            chamfer(lip_top.outer_wire().edges(), length=min(0.6, p.lip / 3, p.wall / 3))
         except Exception:
             pass
     lid_part = lid.part.moved(Location((ox + 10, 0, 0)))

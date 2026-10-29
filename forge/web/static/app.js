@@ -184,8 +184,11 @@ function renderParams(keepValues) {
   const specs = (S.schema && S.schema.params) || [];
   $('procLabel').textContent = (S.schema && S.schema.process) || '';
   const next = {};
+  const oldDefaults = S.defaults || {};
   for (const sp of specs) {
-    next[sp.name] = keepValues && sp.name in S.params ? S.params[sp.name] : sp.default;
+    // keep the slider value, unless the code's default for it changed (then the code wins)
+    const defaultChanged = sp.name in oldDefaults && oldDefaults[sp.name] !== sp.default;
+    next[sp.name] = keepValues && sp.name in S.params && !defaultChanged ? S.params[sp.name] : sp.default;
     const row = document.createElement('div'); row.className = 'param' + (sp.kind === 'bool' ? ' bool' : '');
     const lab = document.createElement('label'); lab.innerHTML = `${sp.name}${sp.unit ? ` <span class="doc">(${sp.unit})</span>` : ''}<div class="doc">${esc(sp.doc || '')}</div>`;
     row.appendChild(lab);
@@ -211,6 +214,7 @@ function renderParams(keepValues) {
     box.appendChild(row);
   }
   S.params = next;
+  S.defaults = Object.fromEntries(specs.map((sp) => [sp.name, sp.default]));
 }
 function setParam(name, value, debounce) {
   S.params[name] = value;
