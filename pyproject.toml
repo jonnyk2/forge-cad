@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "forge-cad"
+version = "0.3.0"
+description = "AI-native parametric CAD for 3D-printed and machined parts (build123d + DFM checks + MCP + web UI)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "build123d>=0.8",
+    "numpy",
+    "matplotlib",
+    "flask",
+    "mcp>=1.2",
+    "anthropic>=0.40",
+]
+
+[project.scripts]
+forge = "forge.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["forge*"]
+
+[tool.setuptools.package-data]
+"forge.web" = ["static/*"]

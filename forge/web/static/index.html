@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>forge</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+<style>
+:root{
+  --bg:#15171c; --panel:#1d2026; --panel2:#24282f; --line:#2f343d; --fg:#e6e8ec; --muted:#8b93a1;
+  --accent:#f2a93b; --err:#ef5a5a; --warn:#f2a93b; --info:#5aa5ef; --ok:#5ad38a; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#app{display:grid;grid-template-columns:260px 1fr 340px;grid-template-rows:44px 1fr;height:100%}
+header{grid-column:1/4;display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+header .logo{font-weight:700;letter-spacing:.08em;color:var(--accent)}
+header .status{color:var(--muted);flex:1;font-family:var(--mono);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+button{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font:inherit}
+button:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);color:#1a1200;border-color:transparent;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:10px}
+aside h3,section h3{margin:10px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.parts a{display:block;padding:6px 8px;border-radius:6px;color:var(--fg);text-decoration:none;cursor:pointer}
+.parts a:hover{background:var(--panel2)} .parts a.active{background:var(--panel2);border-left:3px solid var(--accent)}
+.parts small{display:block;color:var(--muted);font-size:11px}
+main{position:relative;display:grid;grid-template-rows:1fr auto;min-width:0}
+#viewer{position:relative;min-height:200px}
+#viewer canvas{display:block;position:absolute;inset:0}
+.hud{position:absolute;left:10px;top:10px;display:flex;gap:6px;flex-wrap:wrap}
+.hud .pill{background:rgba(29,32,38,.85);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-family:var(--mono);font-size:11px}
+.hud2{position:absolute;right:10px;top:10px;display:flex;gap:6px;flex-wrap:wrap}
+.section-ctl{position:absolute;left:10px;bottom:10px;display:flex;gap:8px;align-items:center;background:rgba(29,32,38,.85);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+#editorWrap{border-top:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;height:280px;resize:vertical;overflow:hidden}
+#editorWrap.collapsed{height:34px}
+.editorBar{display:flex;gap:8px;align-items:center;padding:4px 10px;border-bottom:1px solid var(--line)}
+.editorBar .grow{flex:1}
+.CodeMirror{flex:1;height:auto;font-family:var(--mono);font-size:12px}
+.right{background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:10px;display:flex;flex-direction:column;gap:6px}
+.param{display:grid;grid-template-columns:1fr 64px;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.param label{display:block}
+.param .doc{color:var(--muted);font-size:11px}
+.param input[type=range]{width:100%;grid-column:1/2;accent-color:var(--accent)}
+.param input[type=number],.param select{width:100%;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:3px 6px;font:inherit}
+.param.bool{grid-template-columns:1fr auto}
+.checks .v{padding:6px 8px;border-radius:6px;margin:4px 0;background:var(--panel2);cursor:pointer;border-left:3px solid var(--info)}
+.checks .v.error{border-left-color:var(--err)} .checks .v.warn{border-left-color:var(--warn)} .checks .v.info{border-left-color:var(--info)}
+.checks .v b{font-family:var(--mono);font-size:11px}
+.checks .v .fix{color:var(--muted);font-size:11px;margin-top:2px}
+pre.report{font-family:var(--mono);font-size:11px;white-space:pre-wrap;background:var(--panel2);padding:8px;border-radius:6px;margin:0;color:#cfd4dc}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:9}
+.modal.open{display:flex}
+.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(760px,92vw);max-height:85vh;overflow:auto}
+.modal input{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font:inherit;width:100%}
+.starter{padding:8px;border:1px solid var(--line);border-radius:6px;margin:6px 0;cursor:pointer}
+.starter:hover,.starter.sel{border-color:var(--accent)}
+.ai .msg{padding:6px 8px;border-radius:6px;background:var(--panel2);font-size:12px;white-space:pre-wrap}
+.ai .msg.tool{color:var(--muted);font-family:var(--mono);font-size:11px;background:transparent;padding:2px 8px}
+.ai .msg.ok{border-left:3px solid var(--ok)} .ai .msg.bad{border-left:3px solid var(--err)}
+.err{color:var(--err);font-family:var(--mono);white-space:pre-wrap;font-size:11px}
+.md{line-height:1.5} .md code{font-family:var(--mono);background:var(--panel2);padding:1px 4px;border-radius:3px} .md pre{background:var(--panel2);padding:8px;border-radius:6px;overflow:auto;font-size:11px}
+.md table{border-collapse:collapse} .md td,.md th{border:1px solid var(--line);padding:3px 6px;text-align:left}
+@media (max-width:900px){#app{grid-template-columns:1fr;grid-template-rows:44px auto 1fr auto} aside,.right{border:0;border-bottom:1px solid var(--line);max-height:30vh}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <span class="logo">FORGE</span>
+    <span class="status" id="status">ready</span>
+    <button id="btnOrient" title="Rank print orientations">Orient</button>
+    <button id="btnGuide">Guide</button>
+    <button id="btnSettings" title="API key & model">⚙</button>
+    <button id="btnExport" class="primary">Export ▾</button>
+  </header>
+
+  <aside>
+    <h3>Project</h3>
+    <div class="row"><select id="projectSel" style="flex:1;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px"></select><button id="btnNewProject" title="New project">+</button></div>
+    <div class="row" style="margin-top:8px"><button id="btnNew" style="flex:1">+ New part</button><button id="btnRefresh" title="Reload list">↻</button></div>
+    <h3>Parts</h3>
+    <div class="parts" id="parts"></div>
+    <h3>Folder</h3>
+    <div class="doc" id="project" style="font-family:var(--mono);font-size:11px;color:var(--muted);word-break:break-all"></div>
+  </aside>
+
+  <main>
+    <div id="viewer">
+      <div class="hud" id="hud"></div>
+      <div class="hud2">
+        <button data-view="iso">Iso</button><button data-view="front">Front</button><button data-view="top">Top</button><button data-view="right">Right</button>
+        <button id="btnEdges" title="Toggle edges">Edges</button>
+        <button id="btnMeasure" title="Click two points to measure">Measure</button>
+      </div>
+      <div class="section-ctl">
+        <label>Section</label>
+        <select id="secAxis"><option value="">off</option><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select>
+        <input type="range" id="secPos" min="0" max="1000" value="500" style="width:160px;accent-color:var(--accent)">
+      </div>
+    </div>
+    <div id="editorWrap">
+      <div class="editorBar">
+        <button id="btnToggleEditor">Code</button>
+        <span class="grow" id="editorStatus" style="color:var(--muted);font-family:var(--mono);font-size:11px"></span>
+        <button id="btnRevert">Revert</button>
+        <button id="btnSaveBuild" class="primary">Save & build  (⌘/Ctrl+Enter)</button>
+      </div>
+      <textarea id="code"></textarea>
+    </div>
+  </main>
+
+  <div class="right">
+    <h3>Ask the AI <span id="aiModel" style="float:right;color:var(--muted);text-transform:none;letter-spacing:0"></span></h3>
+    <div class="ai">
+      <textarea id="aiPrompt" rows="3" placeholder="e.g. make this 20 mm wider and add two M4 holes in the base — or describe a new part from scratch" style="width:100%;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px;font:inherit;resize:vertical"></textarea>
+      <div class="row" style="margin-top:6px;align-items:center"><button id="aiSend" class="primary">Send  (Ctrl+Enter)</button><span id="aiStatus" style="color:var(--muted);font-size:11px"></span></div>
+      <div id="aiLog" style="max-height:220px;overflow:auto;margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
+    </div>
+    <h3>Parameters <span id="procLabel" style="float:right;color:var(--muted);text-transform:none;letter-spacing:0"></span></h3>
+    <div id="params"></div>
+    <div class="row" style="margin-top:6px"><button id="btnReset">Reset to defaults</button><button id="btnRebuild">Rebuild</button></div>
+    <h3>Checks <span id="checkCount" style="float:right;text-transform:none;letter-spacing:0"></span></h3>
+    <div class="checks" id="checks"></div>
+    <h3>Report</h3>
+    <pre class="report" id="report">—</pre>
+  </div>
+</div>
+
+<div class="modal" id="modalNew"><div class="box">
+  <h3 style="margin-top:0">New part</h3>
+  <input id="newName" placeholder="file name, e.g. hinge_bracket">
+  <h3>Start from</h3>
+  <div id="starters"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:10px"><button id="newCancel">Cancel</button><button id="newCreate" class="primary">Create</button></div>
+</div></div>
+
+<div class="modal" id="modalProject"><div class="box" style="width:420px">
+  <h3 style="margin-top:0">New project</h3>
+  <p style="color:var(--muted)">A project is a folder of part files. It gets one part to start with.</p>
+  <input id="projName" placeholder="project name, e.g. drone_mounts">
+  <div class="row" style="justify-content:flex-end;margin-top:10px"><button id="projCancel">Cancel</button><button id="projCreate" class="primary">Create</button></div>
+</div></div>
+
+<div class="modal" id="modalSettings"><div class="box" style="width:460px">
+  <h3 style="margin-top:0">AI settings</h3>
+  <p style="color:var(--muted)">The in-app AI calls the Claude API directly with your key. Get one at console.anthropic.com → API keys. It's stored only on this computer (~/.forge/config.json).</p>
+  <label>API key <span id="keyHint" style="color:var(--muted);font-family:var(--mono)"></span></label>
+  <input id="apiKey" type="password" placeholder="sk-ant-…" autocomplete="off">
+  <label style="display:block;margin-top:10px">Model</label>
+  <select id="modelSel" style="width:100%;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px"></select>
+  <div class="row" style="justify-content:space-between;margin-top:12px"><button id="keyClear">Forget key</button><span><button id="settingsCancel">Cancel</button> <button id="settingsSave" class="primary">Save</button></span></div>
+</div></div>
+
+<div class="modal" id="modalExport"><div class="box" style="width:380px">
+  <h3 style="margin-top:0">Export</h3>
+  <p style="color:var(--muted)">Files are named <code>part-&lt;paramhash&gt;.ext</code> so a print can be traced to its exact parameters.</p>
+  <div class="row">
+    <button data-fmt="3mf">3MF (print)</button><button data-fmt="stl">STL</button><button data-fmt="step">STEP (CAD/CNC)</button><button data-fmt="glb">GLB</button><button data-fmt="svg">SVG drawing</button><button data-fmt="json">Report JSON</button>
+  </div>
+  <div id="exportResult" style="margin-top:10px"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:10px"><button id="exportClose">Close</button></div>
+</div></div>
+
+<div class="modal" id="modalText"><div class="box"><div class="md" id="modalTextBody"></div><div class="row" style="justify-content:flex-end;margin-top:10px"><button id="textClose">Close</button></div></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>
