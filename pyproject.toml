@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "forge-cad"
-version = "0.3.1"
+version = "0.4.0"
 description = "AI-native parametric CAD for 3D-printed and machined parts (build123d + DFM checks + MCP + web UI)"
 readme = "README.md"
 requires-python = ">=3.10"

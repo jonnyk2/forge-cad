@@ -20,6 +20,6 @@ from .export import export, drawing  # noqa: F401
 from .render import render, section  # noqa: F401
 from . import orient  # noqa: F401
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 __all__ = [n for n in dir() if not n.startswith("_")]

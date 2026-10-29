@@ -16,7 +16,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request, send_from_directory
 
 from .. import PartError, build_part, export as _export, library, load_part, orient as _orient
-from .. import ai
+from .. import ai, commands as C, topology as T
 from ..export import edges_json, mesh_json
 from ..render import section as _section
 
@@ -138,9 +138,7 @@ def api_save(name):
     try:
         path = _resolve(name)
         src = request.json["source"]
-        # keep one backup so a bad save is recoverable
-        if path.exists():
-            shutil.copy(path, path.with_suffix(".py.bak"))
+        _push_history(path)
         path.write_text(src)
         pm = load_part(path)
         return jsonify({"ok": True, "schema": pm.schema()})
@@ -156,8 +154,7 @@ def api_build():
         built = build_part(pm, data.get("params") or None, inspect_samples=int(data.get("samples", 3)))
         res = built.to_dict()
         res["summary"] = built.summary()
-        res["mesh"] = mesh_json(built.shape, tolerance=float(data.get("tolerance", 0.05)))
-        res["edges"] = edges_json(built.shape)
+        res["topo"] = T.viewer_payload(built.shape, tolerance=float(data.get("tolerance", 0.05)))
         return jsonify(res)
     except Exception as e:
         return _error(e)
@@ -302,6 +299,144 @@ def api_ai_poll(job_id):
     if snap is None:
         return jsonify({"error": "no such job"}), 404
     return jsonify(snap)
+
+
+# ---- model-level undo/redo (per part file) ---------------------------------
+_HISTORY: dict[str, list[str]] = {}
+_REDO: dict[str, list[str]] = {}
+
+
+def _push_history(path: Path):
+    if path.exists():
+        _HISTORY.setdefault(str(path), []).append(path.read_text())
+        _HISTORY[str(path)] = _HISTORY[str(path)][-50:]
+        _REDO.pop(str(path), None)
+
+
+@app.post("/api/undo")
+def api_undo():
+    try:
+        path = _resolve((request.json or {})["name"])
+        stack = _HISTORY.get(str(path)) or []
+        if not stack:
+            return jsonify({"error": "nothing to undo"}), 400
+        _REDO.setdefault(str(path), []).append(path.read_text())
+        path.write_text(stack.pop())
+        return jsonify({"ok": True, "remaining": len(stack)})
+    except Exception as e:
+        return _error(e)
+
+
+@app.post("/api/redo")
+def api_redo():
+    try:
+        path = _resolve((request.json or {})["name"])
+        stack = _REDO.get(str(path)) or []
+        if not stack:
+            return jsonify({"error": "nothing to redo"}), 400
+        _HISTORY.setdefault(str(path), []).append(path.read_text())
+        path.write_text(stack.pop())
+        return jsonify({"ok": True})
+    except Exception as e:
+        return _error(e)
+
+
+# ---- selection → selector, measure --------------------------------------
+@app.post("/api/selector")
+def api_selector():
+    """{name, params, kind: faces|edges, index} → {expr, stable}"""
+    data = request.json or {}
+    try:
+        pm = load_part(_resolve(data["name"]))
+        built = build_part(pm, data.get("params") or None, check=False)
+        var = C.find_build_site(pm.path.read_text()).var or "part"
+        return jsonify(T.resolve_selector(built.shape, data["kind"], int(data["index"]), var))
+    except Exception as e:
+        return _error(e)
+
+
+@app.post("/api/measure")
+def api_measure():
+    """{name, params, items: [{kind, index}, ...]} → measurements of one or two items."""
+    data = request.json or {}
+    try:
+        pm = load_part(_resolve(data["name"]))
+        built = build_part(pm, data.get("params") or None, check=False)
+        shape = built.shape
+        faces, edges = list(shape.faces()), list(shape.edges())
+        objs = []
+        for it in data.get("items", [])[:2]:
+            objs.append(faces[int(it["index"])] if it["kind"] == "faces" else edges[int(it["index"])])
+        out = {}
+        if len(objs) == 1:
+            o = objs[0]
+            out["info"] = T.face_info(o, 0) if o in faces else T.edge_info(o, 0)
+        elif len(objs) == 2:
+            a, b = objs
+            out["distance"] = round(float(a.distance_to(b)), 3)
+            ca, cb = a.center(), b.center()
+            out["center_delta"] = [round(cb.X - ca.X, 3), round(cb.Y - ca.Y, 3), round(cb.Z - ca.Z, 3)]
+            out["center_distance"] = round((cb - ca).length, 3)
+            try:
+                from ..inspect import face_angle
+                if a in faces and b in faces:
+                    out["angle"] = round(face_angle(a, b), 2)
+            except Exception:
+                pass
+        return jsonify(out)
+    except Exception as e:
+        return _error(e)
+
+
+# ---- commands that write code -------------------------------------------
+@app.get("/api/commands")
+def api_commands():
+    return jsonify(C.catalog())
+
+
+@app.post("/api/command/preview")
+def api_command_preview():
+    """{name, params, cmd, values} → build a temp copy with the generated code; returns code + topo + violations."""
+    data = request.json or {}
+    try:
+        path = _resolve(data["name"])
+        src = path.read_text()
+        code = C.generate(data["cmd"], data.get("values") or {}, src)
+        new_src, a, b = C.insert_into_build(src, code)
+        tmp = path.with_name(f"_preview_{path.stem}.py")
+        tmp.write_text(new_src)
+        try:
+            pm = load_part(tmp)
+            built = build_part(pm, data.get("params") or None)
+            res = {"code": code, "lines": [a, b], "ok": True, "summary": built.summary(),
+                   "violations": [v.to_dict() for v in built.violations], "report": built.report.to_dict(),
+                   "topo": T.viewer_payload(built.shape)}
+        except Exception as e:
+            res = {"code": code, "lines": [a, b], "ok": False, "error": str(e), "detail": getattr(e, "detail", "")}
+        finally:
+            try:
+                tmp.unlink()
+            except Exception:
+                pass
+        return jsonify(res)
+    except Exception as e:
+        return _error(e)
+
+
+@app.post("/api/command/apply")
+def api_command_apply():
+    data = request.json or {}
+    try:
+        path = _resolve(data["name"])
+        src = path.read_text()
+        code = data.get("code") or C.generate(data["cmd"], data.get("values") or {}, src)
+        new_src, a, b = C.insert_into_build(src, code)
+        _push_history(path)
+        path.write_text(new_src)
+        pm = load_part(path)
+        return jsonify({"ok": True, "lines": [a, b], "source": new_src, "schema": pm.schema()})
+    except Exception as e:
+        return _error(e)
 
 
 def serve(project: Path = Path("."), port: int = 8765, open_browser: bool = True):

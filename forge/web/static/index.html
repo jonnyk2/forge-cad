@@ -9,61 +9,96 @@
 <style>
 :root{
   --bg:#15171c; --panel:#1d2026; --panel2:#24282f; --line:#2f343d; --fg:#e6e8ec; --muted:#8b93a1;
-  --accent:#f2a93b; --err:#ef5a5a; --warn:#f2a93b; --info:#5aa5ef; --ok:#5ad38a; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --accent:#f2a93b; --err:#ef5a5a; --warn:#f2a93b; --info:#5aa5ef; --ok:#5ad38a; --sel:#4cc2ff;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
-html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-#app{display:grid;grid-template-columns:260px 1fr 340px;grid-template-rows:44px 1fr;height:100%}
-header{grid-column:1/4;display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+#app{display:grid;grid-template-columns:250px 1fr 330px;grid-template-rows:42px 1fr;height:100%}
+header{grid-column:1/4;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--line)}
 header .logo{font-weight:700;letter-spacing:.08em;color:var(--accent)}
 header .status{color:var(--muted);flex:1;font-family:var(--mono);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-button{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font:inherit}
-button:hover{border-color:var(--muted)}
-button.primary{background:var(--accent);color:#1a1200;border-color:transparent;font-weight:600}
-button:disabled{opacity:.5;cursor:default}
-aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:10px}
-aside h3,section h3{margin:10px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-.parts a{display:block;padding:6px 8px;border-radius:6px;color:var(--fg);text-decoration:none;cursor:pointer}
+button{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:5px 9px;cursor:pointer;font:inherit}
+button:hover{border-color:var(--muted)} button.primary{background:var(--accent);color:#1a1200;border-color:transparent;font-weight:600}
+button.active{border-color:var(--sel);color:var(--sel)} button:disabled{opacity:.5;cursor:default}
+select,input[type=text],input[type=number],input[type=password],textarea{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:4px 6px;font:inherit}
+aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:10px;display:flex;flex-direction:column;gap:4px}
+h3{margin:8px 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.parts a{display:block;padding:5px 8px;border-radius:6px;color:var(--fg);cursor:pointer}
 .parts a:hover{background:var(--panel2)} .parts a.active{background:var(--panel2);border-left:3px solid var(--accent)}
 .parts small{display:block;color:var(--muted);font-size:11px}
-main{position:relative;display:grid;grid-template-rows:1fr auto;min-width:0}
-#viewer{position:relative;min-height:200px}
-#viewer canvas{display:block;position:absolute;inset:0}
-.hud{position:absolute;left:10px;top:10px;display:flex;gap:6px;flex-wrap:wrap}
-.hud .pill{background:rgba(29,32,38,.85);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-family:var(--mono);font-size:11px}
-.hud2{position:absolute;right:10px;top:10px;display:flex;gap:6px;flex-wrap:wrap}
-.section-ctl{position:absolute;left:10px;bottom:10px;display:flex;gap:8px;align-items:center;background:rgba(29,32,38,.85);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
-#editorWrap{border-top:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;height:280px;resize:vertical;overflow:hidden}
+.tree .node{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;cursor:pointer}
+.tree .node:hover{background:var(--panel2)} .tree .node.sel{color:var(--sel)}
+.tree .eye{width:16px;text-align:center;color:var(--muted)} .tree .eye.off{opacity:.3}
+.tree .sub{margin-left:14px}
+main{position:relative;display:grid;grid-template-rows:auto 1fr auto;min-width:0}
+/* toolbar */
+.toolbar{display:flex;gap:2px;padding:4px 8px;background:var(--panel);border-bottom:1px solid var(--line);align-items:center;flex-wrap:wrap}
+.toolbar .grp{position:relative}
+.toolbar .grp>button{border:0;background:transparent;padding:5px 10px;font-weight:600}
+.toolbar .grp>button:hover,.toolbar .grp.open>button{background:var(--panel2)}
+.toolbar .menu{display:none;position:absolute;left:0;top:100%;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:8px;min-width:230px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.toolbar .grp.open .menu{display:block}
+.menu .item{display:flex;justify-content:space-between;gap:12px;padding:6px 10px;border-radius:5px;cursor:pointer}
+.menu .item:hover{background:var(--panel2)} .menu .item kbd{color:var(--muted);font-family:var(--mono);font-size:11px}
+.toolbar .spacer{flex:1} .toolbar .filt{display:flex;gap:2px;align-items:center;color:var(--muted);font-size:11px}
+.toolbar .filt button{padding:3px 7px;font-size:11px}
+#viewer{position:relative;min-height:200px;overflow:hidden}
+#viewer canvas.main{display:block;position:absolute;inset:0}
+#cube{position:absolute;right:12px;top:10px;width:110px;height:110px;cursor:pointer}
+.hud{position:absolute;left:10px;top:10px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none}
+.pill{background:rgba(29,32,38,.85);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-family:var(--mono);font-size:11px}
+.navbar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:4px;background:rgba(29,32,38,.9);border:1px solid var(--line);border-radius:10px;padding:5px 8px;align-items:center}
+.navbar button{padding:4px 8px;font-size:12px}
+.navbar .sep{width:1px;height:18px;background:var(--line);margin:0 3px}
+#selpanel{position:absolute;left:10px;bottom:10px;max-width:46%;background:rgba(29,32,38,.92);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;display:none}
+#selpanel.show{display:block} #selpanel .expr{font-family:var(--mono);font-size:11px;color:var(--sel);word-break:break-all}
+#selpanel .meas{font-family:var(--mono);font-size:11px;color:var(--ok);margin-top:4px}
+/* command dialog */
+#dialog{position:absolute;right:12px;top:130px;width:300px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);display:none;z-index:15;max-height:calc(100% - 150px);overflow:auto}
+#dialog.show{display:block}
+#dialog .head{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:600}
+#dialog .body{padding:8px 12px;display:flex;flex-direction:column;gap:6px}
+#dialog .f{display:grid;grid-template-columns:1fr 120px;gap:6px;align-items:center;font-size:12px}
+#dialog .f label{color:var(--muted)} #dialog .f input,#dialog .f select{width:100%}
+#dialog .f.selection{grid-template-columns:1fr} #dialog .chips{display:flex;gap:4px;flex-wrap:wrap;min-height:26px;padding:3px;border:1px dashed var(--line);border-radius:5px;cursor:pointer}
+#dialog .chips.active{border-color:var(--sel)} .chip{background:var(--panel2);border-radius:999px;padding:1px 8px;font-family:var(--mono);font-size:10px;color:var(--sel)}
+#dialog .foot{display:flex;justify-content:space-between;gap:6px;padding:8px 12px;border-top:1px solid var(--line);align-items:center}
+#dialog .pv{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:pre-wrap;max-height:90px;overflow:auto;background:var(--panel2);padding:6px;border-radius:5px}
+#dialog .pv.bad{color:var(--err)} #dialog .pv.ok{color:var(--ok)}
+/* context menu + palette */
+#ctx{position:fixed;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px;min-width:200px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#ctx.show{display:block}
+#palette{position:fixed;left:50%;top:18%;transform:translateX(-50%);width:460px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.6);display:none;z-index:40}
+#palette.show{display:block} #palette input{width:100%;border:0;border-bottom:1px solid var(--line);border-radius:10px 10px 0 0;padding:12px 14px;font-size:15px}
+#palette .list{max-height:320px;overflow:auto;padding:4px}
+#palette .item.hi{background:var(--panel2)}
+/* editor */
+#editorWrap{border-top:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;height:240px;resize:vertical;overflow:hidden}
 #editorWrap.collapsed{height:34px}
-.editorBar{display:flex;gap:8px;align-items:center;padding:4px 10px;border-bottom:1px solid var(--line)}
-.editorBar .grow{flex:1}
+.editorBar{display:flex;gap:8px;align-items:center;padding:4px 10px;border-bottom:1px solid var(--line)} .editorBar .grow{flex:1}
 .CodeMirror{flex:1;height:auto;font-family:var(--mono);font-size:12px}
+.cm-errline{background:rgba(239,90,90,.25)!important} .cm-newline{background:rgba(76,194,255,.18)!important}
 .right{background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:10px;display:flex;flex-direction:column;gap:6px}
 .param{display:grid;grid-template-columns:1fr 64px;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
-.param label{display:block}
-.param .doc{color:var(--muted);font-size:11px}
-.param input[type=range]{width:100%;grid-column:1/2;accent-color:var(--accent)}
-.param input[type=number],.param select{width:100%;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:3px 6px;font:inherit}
-.param.bool{grid-template-columns:1fr auto}
+.param .doc{color:var(--muted);font-size:11px} .param input[type=range]{width:100%;grid-column:1/2;accent-color:var(--accent)}
+.param input[type=number],.param select{width:100%} .param.bool{grid-template-columns:1fr auto}
 .checks .v{padding:6px 8px;border-radius:6px;margin:4px 0;background:var(--panel2);cursor:pointer;border-left:3px solid var(--info)}
-.checks .v.error{border-left-color:var(--err)} .checks .v.warn{border-left-color:var(--warn)} .checks .v.info{border-left-color:var(--info)}
-.checks .v b{font-family:var(--mono);font-size:11px}
-.checks .v .fix{color:var(--muted);font-size:11px;margin-top:2px}
+.checks .v.error{border-left-color:var(--err)} .checks .v.warn{border-left-color:var(--warn)}
+.checks .v b{font-family:var(--mono);font-size:11px} .checks .v .fix{color:var(--muted);font-size:11px;margin-top:2px}
 pre.report{font-family:var(--mono);font-size:11px;white-space:pre-wrap;background:var(--panel2);padding:8px;border-radius:6px;margin:0;color:#cfd4dc}
-.row{display:flex;gap:6px;flex-wrap:wrap}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:9}
-.modal.open{display:flex}
-.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(760px,92vw);max-height:85vh;overflow:auto}
-.modal input{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font:inherit;width:100%}
-.starter{padding:8px;border:1px solid var(--line);border-radius:6px;margin:6px 0;cursor:pointer}
-.starter:hover,.starter.sel{border-color:var(--accent)}
 .ai .msg{padding:6px 8px;border-radius:6px;background:var(--panel2);font-size:12px;white-space:pre-wrap}
 .ai .msg.tool{color:var(--muted);font-family:var(--mono);font-size:11px;background:transparent;padding:2px 8px}
 .ai .msg.ok{border-left:3px solid var(--ok)} .ai .msg.bad{border-left:3px solid var(--err)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:50}
+.modal.open{display:flex} .modal .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(760px,92vw);max-height:85vh;overflow:auto}
+.modal input{width:100%}
+.starter{padding:8px;border:1px solid var(--line);border-radius:6px;margin:6px 0;cursor:pointer} .starter:hover,.starter.sel{border-color:var(--accent)}
 .err{color:var(--err);font-family:var(--mono);white-space:pre-wrap;font-size:11px}
 .md{line-height:1.5} .md code{font-family:var(--mono);background:var(--panel2);padding:1px 4px;border-radius:3px} .md pre{background:var(--panel2);padding:8px;border-radius:6px;overflow:auto;font-size:11px}
 .md table{border-collapse:collapse} .md td,.md th{border:1px solid var(--line);padding:3px 6px;text-align:left}
-@media (max-width:900px){#app{grid-template-columns:1fr;grid-template-rows:44px auto 1fr auto} aside,.right{border:0;border-bottom:1px solid var(--line);max-height:30vh}}
+kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);border-radius:3px;padding:0 4px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -71,6 +106,7 @@ pre.report{font-family:var(--mono);font-size:11px;white-space:pre-wrap;backgroun
   <header>
     <span class="logo">FORGE</span>
     <span class="status" id="status">ready</span>
+    <button id="btnUndo" title="Undo (Ctrl+Z)">↶</button><button id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
     <button id="btnOrient" title="Rank print orientations">Orient</button>
     <button id="btnGuide">Guide</button>
     <button id="btnSettings" title="API key & model">⚙</button>
@@ -79,34 +115,47 @@ pre.report{font-family:var(--mono);font-size:11px;white-space:pre-wrap;backgroun
 
   <aside>
     <h3>Project</h3>
-    <div class="row"><select id="projectSel" style="flex:1;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px"></select><button id="btnNewProject" title="New project">+</button></div>
-    <div class="row" style="margin-top:8px"><button id="btnNew" style="flex:1">+ New part</button><button id="btnRefresh" title="Reload list">↻</button></div>
+    <div class="row"><select id="projectSel" style="flex:1"></select><button id="btnNewProject" title="New project">+</button></div>
+    <div class="row" style="margin-top:6px"><button id="btnNew" style="flex:1">+ New part</button><button id="btnRefresh" title="Reload">↻</button></div>
     <h3>Parts</h3>
     <div class="parts" id="parts"></div>
+    <h3>Browser</h3>
+    <div class="tree" id="tree"></div>
     <h3>Folder</h3>
-    <div class="doc" id="project" style="font-family:var(--mono);font-size:11px;color:var(--muted);word-break:break-all"></div>
+    <div id="project" style="font-family:var(--mono);font-size:11px;color:var(--muted);word-break:break-all"></div>
   </aside>
 
   <main>
+    <div class="toolbar" id="toolbar">
+      <span class="spacer"></span>
+      <span class="filt">select: <button data-filter="any" class="active">any</button><button data-filter="faces">faces</button><button data-filter="edges">edges</button><button data-filter="bodies">bodies</button></span>
+      <button id="btnPalette" title="Command palette (S)">S ⌕</button>
+    </div>
     <div id="viewer">
       <div class="hud" id="hud"></div>
-      <div class="hud2">
-        <button data-view="iso">Iso</button><button data-view="front">Front</button><button data-view="top">Top</button><button data-view="right">Right</button>
-        <button id="btnEdges" title="Toggle edges">Edges</button>
-        <button id="btnMeasure" title="Click two points to measure">Measure</button>
-      </div>
-      <div class="section-ctl">
-        <label>Section</label>
+      <canvas id="cube" width="220" height="220"></canvas>
+      <div id="selpanel"></div>
+      <div class="navbar">
+        <button data-view="iso" title="Home / iso">⌂</button>
+        <button id="btnFit" title="Fit (F6)">⤢</button>
+        <button id="btnZoomSel" title="Zoom to selection">◎</button>
+        <span class="sep"></span>
+        <select id="shading" title="Visual style"><option value="shaded">Shaded + edges</option><option value="plain">Shaded</option><option value="wire">Wireframe</option><option value="xray">X-ray</option></select>
+        <button id="btnGrid" class="active" title="Grid">#</button>
+        <button id="btnOrtho" title="Orthographic / perspective">⊞</button>
+        <span class="sep"></span>
+        <label style="font-size:11px;color:var(--muted)">section</label>
         <select id="secAxis"><option value="">off</option><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select>
-        <input type="range" id="secPos" min="0" max="1000" value="500" style="width:160px;accent-color:var(--accent)">
+        <input type="range" id="secPos" min="0" max="1000" value="500" style="width:110px;accent-color:var(--accent)">
       </div>
+      <div id="dialog"></div>
     </div>
     <div id="editorWrap">
       <div class="editorBar">
         <button id="btnToggleEditor">Code</button>
         <span class="grow" id="editorStatus" style="color:var(--muted);font-family:var(--mono);font-size:11px"></span>
         <button id="btnRevert">Revert</button>
-        <button id="btnSaveBuild" class="primary">Save & build  (⌘/Ctrl+Enter)</button>
+        <button id="btnSaveBuild" class="primary">Save & build (Ctrl+Enter)</button>
       </div>
       <textarea id="code"></textarea>
     </div>
@@ -115,9 +164,9 @@ pre.report{font-family:var(--mono);font-size:11px;white-space:pre-wrap;backgroun
   <div class="right">
     <h3>Ask the AI <span id="aiModel" style="float:right;color:var(--muted);text-transform:none;letter-spacing:0"></span></h3>
     <div class="ai">
-      <textarea id="aiPrompt" rows="3" placeholder="e.g. make this 20 mm wider and add two M4 holes in the base — or describe a new part from scratch" style="width:100%;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px;font:inherit;resize:vertical"></textarea>
-      <div class="row" style="margin-top:6px;align-items:center"><button id="aiSend" class="primary">Send  (Ctrl+Enter)</button><span id="aiStatus" style="color:var(--muted);font-size:11px"></span></div>
-      <div id="aiLog" style="max-height:220px;overflow:auto;margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
+      <textarea id="aiPrompt" rows="3" placeholder="e.g. make this 20 mm wider and add two M4 holes in the base — or describe a new part from scratch" style="width:100%;resize:vertical"></textarea>
+      <div class="row" style="margin-top:6px"><button id="aiSend" class="primary">Send (Ctrl+Enter)</button><span id="aiStatus" style="color:var(--muted);font-size:11px"></span></div>
+      <div id="aiLog" style="max-height:200px;overflow:auto;margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
     </div>
     <h3>Parameters <span id="procLabel" style="float:right;color:var(--muted);text-transform:none;letter-spacing:0"></span></h3>
     <div id="params"></div>
@@ -129,41 +178,37 @@ pre.report{font-family:var(--mono);font-size:11px;white-space:pre-wrap;backgroun
   </div>
 </div>
 
+<div id="ctx"></div>
+<div id="palette"><input id="palInput" placeholder="Type a command… (Esc to close)"><div class="list" id="palList"></div></div>
+
 <div class="modal" id="modalNew"><div class="box">
   <h3 style="margin-top:0">New part</h3>
   <input id="newName" placeholder="file name, e.g. hinge_bracket">
-  <h3>Start from</h3>
-  <div id="starters"></div>
+  <h3>Start from</h3><div id="starters"></div>
   <div class="row" style="justify-content:flex-end;margin-top:10px"><button id="newCancel">Cancel</button><button id="newCreate" class="primary">Create</button></div>
 </div></div>
-
 <div class="modal" id="modalProject"><div class="box" style="width:420px">
   <h3 style="margin-top:0">New project</h3>
   <p style="color:var(--muted)">A project is a folder of part files. It gets one part to start with.</p>
   <input id="projName" placeholder="project name, e.g. drone_mounts">
   <div class="row" style="justify-content:flex-end;margin-top:10px"><button id="projCancel">Cancel</button><button id="projCreate" class="primary">Create</button></div>
 </div></div>
-
 <div class="modal" id="modalSettings"><div class="box" style="width:460px">
   <h3 style="margin-top:0">AI settings</h3>
-  <p style="color:var(--muted)">The in-app AI calls the Claude API directly with your key. Get one at console.anthropic.com → API keys. It's stored only on this computer (~/.forge/config.json).</p>
+  <p style="color:var(--muted)">The in-app AI calls the Claude API directly with your key (console.anthropic.com → API keys). Stored only on this computer (~/.forge/config.json).</p>
   <label>API key <span id="keyHint" style="color:var(--muted);font-family:var(--mono)"></span></label>
   <input id="apiKey" type="password" placeholder="sk-ant-…" autocomplete="off">
   <label style="display:block;margin-top:10px">Model</label>
-  <select id="modelSel" style="width:100%;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px"></select>
+  <select id="modelSel" style="width:100%"></select>
   <div class="row" style="justify-content:space-between;margin-top:12px"><button id="keyClear">Forget key</button><span><button id="settingsCancel">Cancel</button> <button id="settingsSave" class="primary">Save</button></span></div>
 </div></div>
-
-<div class="modal" id="modalExport"><div class="box" style="width:380px">
+<div class="modal" id="modalExport"><div class="box" style="width:400px">
   <h3 style="margin-top:0">Export</h3>
   <p style="color:var(--muted)">Files are named <code>part-&lt;paramhash&gt;.ext</code> so a print can be traced to its exact parameters.</p>
-  <div class="row">
-    <button data-fmt="3mf">3MF (print)</button><button data-fmt="stl">STL</button><button data-fmt="step">STEP (CAD/CNC)</button><button data-fmt="glb">GLB</button><button data-fmt="svg">SVG drawing</button><button data-fmt="json">Report JSON</button>
-  </div>
+  <div class="row"><button data-fmt="3mf">3MF (print)</button><button data-fmt="stl">STL</button><button data-fmt="step">STEP (CAD/CNC)</button><button data-fmt="glb">GLB</button><button data-fmt="svg">SVG drawing</button><button data-fmt="json">Report JSON</button></div>
   <div id="exportResult" style="margin-top:10px"></div>
   <div class="row" style="justify-content:flex-end;margin-top:10px"><button id="exportClose">Close</button></div>
 </div></div>
-
 <div class="modal" id="modalText"><div class="box"><div class="md" id="modalTextBody"></div><div class="row" style="justify-content:flex-end;margin-top:10px"><button id="textClose">Close</button></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>

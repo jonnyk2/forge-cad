@@ -76,3 +76,48 @@ def test_fit_diameter_fdm():
     assert fit_diameter(5, "sliding") == pytest.approx(5.5, abs=0.01)   # 5 + 0.2 fit + 0.3 shrink
     assert screw_diameter("M3", "clearance") == pytest.approx(3.7, abs=0.01)  # 3.4 + 0.3
     assert screw_diameter("M3", "heatset") == pytest.approx(4.0, abs=0.01)
+
+
+def test_viewer_payload_and_selectors():
+    from forge import Align, Axis, Box, BuildPart, Cylinder, Locations, Mode, load_part, build_part
+    from forge import topology as T
+    with BuildPart() as p:
+        Box(40, 30, 10, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        with Locations((10, 0, 10)):
+            Cylinder(3, 10, mode=Mode.SUBTRACT)
+    shape = p.part
+    topo = T.viewer_payload(shape)
+    assert len(topo["faces"]) == len(list(shape.faces()))
+    assert sum(f["tri_count"] for f in topo["faces"]) * 3 == len(topo["indices"])
+    assert len(topo["polylines"]) == len(topo["edges"])
+    # top face → stable selector
+    top_idx = max(range(len(topo["faces"])), key=lambda i: topo["faces"][i]["center"][2] if topo["faces"][i]["type"] == "plane" else -1)
+    sel = T.resolve_selector(shape, "faces", top_idx, "part")
+    assert sel["stable"] and "sort_by(Axis.Z)[-1]" in sel["expr"]
+    # the hole's cylindrical face
+    cyl_idx = next(i for i, f in enumerate(topo["faces"]) if f["type"] == "cylinder")
+    sel = T.resolve_selector(shape, "faces", cyl_idx, "part")
+    assert sel["stable"] and "CYLINDER" in sel["expr"]
+
+
+def test_command_preview_apply_roundtrip(tmp_path):
+    import shutil
+    from forge import commands as C, load_part, build_part
+    src = (ROOT / "starters" / "blank.py").read_text()
+    part = tmp_path / "plate.py"
+    part.write_text(src)
+    for cmd, vals in [
+        ("hole", {"kind": "counterbore", "screw": "M4", "pattern": "grid 2x2", "spacing_x": 30, "spacing_y": 20}),
+        ("extrude", {"shape": "Circle", "size_a": 12, "distance": 8, "op": "join", "on": ["part.faces().sort_by(Axis.Z)[-1]"]}),
+        ("fillet", {"edges": ["part.edges().filter_by(Axis.Z)"], "radius": 2}),
+        ("chamfer", {"edges": ["part.faces().sort_by(Axis.Z)[0].edges()"], "length": 0.4}),
+        ("box", {"x": 10, "y": 10, "z": 5, "px": 20, "py": 10, "pz": 4}),
+        ("move", {"dz": 2, "rz": 10}),
+        ("mirror", {"plane": "Plane.YZ"}),
+    ]:
+        s = part.read_text()
+        code = C.generate(cmd, vals, s)
+        new, a, b = C.insert_into_build(s, code)
+        part.write_text(new)
+        built = build_part(load_part(part))
+        assert built.report.n_solids >= 1 and built.report.valid, cmd
