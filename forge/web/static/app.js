@@ -265,54 +265,7 @@ async function loadProjects() {
 }
 $('projectSel').onchange = async () => {
   if (S.dirty && !confirm('Discard unsaved code changes?')) return;
-  try { await api('/api/projects/select', { name: $('projectSel').value }); S.part = null; await // ---------------------------------------------------------------- settings
-async function loadSettings() {
-  const r = await api('/api/settings');
-  $('aiModel').textContent = r.has_key ? r.model : 'no API key — ⚙';
-  $('keyHint').textContent = r.has_key ? `(saved: ${r.key_hint})` : '(none saved)';
-  const sel = $('modelSel'); sel.innerHTML = '';
-  for (const m of r.models) { const o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o); }
-  sel.value = r.model;
-  return r;
-}
-$('btnSettings').onclick = async () => { await loadSettings(); $('apiKey').value = ''; $('modalSettings').classList.add('open'); };
-$('settingsCancel').onclick = () => $('modalSettings').classList.remove('open');
-$('settingsSave').onclick = async () => { await api('/api/settings', { api_key: $('apiKey').value, model: $('modelSel').value }); $('modalSettings').classList.remove('open'); await loadSettings(); };
-$('keyClear').onclick = async () => { await api('/api/settings', { clear_key: true }); await loadSettings(); $('apiKey').value = ''; };
-
-// ---------------------------------------------------------------- AI
-function aiMsg(text, cls = '') { const d = document.createElement('div'); d.className = 'msg ' + cls; d.textContent = text; $('aiLog').appendChild(d); $('aiLog').scrollTop = 1e9; return d; }
-async function aiSend() {
-  const prompt = $('aiPrompt').value.trim(); if (!prompt || !S.part) return;
-  if (S.dirty) { if (!confirm('Save your code changes first?')) return; await saveAndBuild(); }
-  const st = await loadSettings();
-  if (!st.has_key) { $('btnSettings').click(); return; }
-  $('aiSend').disabled = true; $('aiStatus').textContent = 'thinking…'; aiMsg('▶ ' + prompt, 'ok');
-  $('aiPrompt').value = '';
-  try {
-    const { id } = await api('/api/ai', { name: S.part, prompt });
-    let since = 0, builds = 0;
-    while (true) {
-      await new Promise((r) => setTimeout(r, 1200));
-      const j = await api(`/api/ai/${id}?since=${since}`);
-      since = j.next;
-      for (const ev of j.events) {
-        if (ev.kind === 'text') aiMsg(ev.text);
-        else if (ev.kind === 'tool') aiMsg('⚙ ' + ev.summary, 'tool');
-        else if (ev.kind === 'build') { builds++; aiMsg(`build ${builds}: ${ev.ok ? 'clean' : 'has errors'} — ${ev.summary.split('\n').find((l) => l.startsWith('checks:')) || ''}`, 'tool'); }
-      }
-      if (j.changed) { $('aiStatus').textContent = `working… (${builds} builds)`; }
-      if (j.done) { if (j.error) aiMsg('✗ ' + j.error, 'bad'); break; }
-    }
-    // reload the part the AI edited
-    const r = await api(`/api/part/${S.part}`); S.source = r.source; cm.setValue(r.source); S.dirty = false; S.schema = r.schema; renderParams(true); await build();
-  } catch (e) { aiMsg('✗ ' + e.message, 'bad'); }
-  $('aiSend').disabled = false; $('aiStatus').textContent = '';
-}
-$('aiSend').onclick = aiSend;
-$('aiPrompt').addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') aiSend(); });
-
-loadProjects().then(() => loadParts()); loadSettings(); } catch (e) { alert(e.message); }
+  try { await api('/api/projects/select', { name: $('projectSel').value }); S.part = null; await loadParts(); } catch (e) { alert(e.message); }
 };
 $('btnNewProject').onclick = () => { $('projName').value = ''; $('modalProject').classList.add('open'); $('projName').focus(); };
 $('projCancel').onclick = () => $('modalProject').classList.remove('open');
@@ -345,54 +298,7 @@ async function openPart(name) {
     await build();
   } catch (e) { showError(e); }
 }
-$('btnRefresh').onclick = () => // ---------------------------------------------------------------- settings
-async function loadSettings() {
-  const r = await api('/api/settings');
-  $('aiModel').textContent = r.has_key ? r.model : 'no API key — ⚙';
-  $('keyHint').textContent = r.has_key ? `(saved: ${r.key_hint})` : '(none saved)';
-  const sel = $('modelSel'); sel.innerHTML = '';
-  for (const m of r.models) { const o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o); }
-  sel.value = r.model;
-  return r;
-}
-$('btnSettings').onclick = async () => { await loadSettings(); $('apiKey').value = ''; $('modalSettings').classList.add('open'); };
-$('settingsCancel').onclick = () => $('modalSettings').classList.remove('open');
-$('settingsSave').onclick = async () => { await api('/api/settings', { api_key: $('apiKey').value, model: $('modelSel').value }); $('modalSettings').classList.remove('open'); await loadSettings(); };
-$('keyClear').onclick = async () => { await api('/api/settings', { clear_key: true }); await loadSettings(); $('apiKey').value = ''; };
-
-// ---------------------------------------------------------------- AI
-function aiMsg(text, cls = '') { const d = document.createElement('div'); d.className = 'msg ' + cls; d.textContent = text; $('aiLog').appendChild(d); $('aiLog').scrollTop = 1e9; return d; }
-async function aiSend() {
-  const prompt = $('aiPrompt').value.trim(); if (!prompt || !S.part) return;
-  if (S.dirty) { if (!confirm('Save your code changes first?')) return; await saveAndBuild(); }
-  const st = await loadSettings();
-  if (!st.has_key) { $('btnSettings').click(); return; }
-  $('aiSend').disabled = true; $('aiStatus').textContent = 'thinking…'; aiMsg('▶ ' + prompt, 'ok');
-  $('aiPrompt').value = '';
-  try {
-    const { id } = await api('/api/ai', { name: S.part, prompt });
-    let since = 0, builds = 0;
-    while (true) {
-      await new Promise((r) => setTimeout(r, 1200));
-      const j = await api(`/api/ai/${id}?since=${since}`);
-      since = j.next;
-      for (const ev of j.events) {
-        if (ev.kind === 'text') aiMsg(ev.text);
-        else if (ev.kind === 'tool') aiMsg('⚙ ' + ev.summary, 'tool');
-        else if (ev.kind === 'build') { builds++; aiMsg(`build ${builds}: ${ev.ok ? 'clean' : 'has errors'} — ${ev.summary.split('\n').find((l) => l.startsWith('checks:')) || ''}`, 'tool'); }
-      }
-      if (j.changed) { $('aiStatus').textContent = `working… (${builds} builds)`; }
-      if (j.done) { if (j.error) aiMsg('✗ ' + j.error, 'bad'); break; }
-    }
-    // reload the part the AI edited
-    const r = await api(`/api/part/${S.part}`); S.source = r.source; cm.setValue(r.source); S.dirty = false; S.schema = r.schema; renderParams(true); await build();
-  } catch (e) { aiMsg('✗ ' + e.message, 'bad'); }
-  $('aiSend').disabled = false; $('aiStatus').textContent = '';
-}
-$('aiSend').onclick = aiSend;
-$('aiPrompt').addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') aiSend(); });
-
-loadProjects().then(() => loadParts()); loadSettings();
+$('btnRefresh').onclick = () => loadParts();
 
 // new part
 $('btnNew').onclick = async () => {
