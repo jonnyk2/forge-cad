@@ -26,7 +26,6 @@ DOCS = HERE.parent.parent / "docs"
 
 app = Flask(__name__, static_folder=str(HERE / "static"), static_url_path="/static")
 ROOT = Path(".").resolve()       # folder that holds projects (each project = a subfolder)
-PROJECT = ROOT                   # the active project
 
 
 def _is_project(d: Path) -> bool:
@@ -40,16 +39,26 @@ def _projects() -> list[Path]:
 
 def _ensure_root():
     """If the served folder has no projects yet, seed an `examples` project from the starters."""
-    global PROJECT
     ROOT.mkdir(parents=True, exist_ok=True)
     if not _projects() and not any(ROOT.glob("*.py")):
         ex = ROOT / "examples"
         ex.mkdir(exist_ok=True)
         for f in STARTERS.glob("*.py"):
             shutil.copy(f, ex / f.name)
+
+
+def _project() -> Path:
+    """The project this request is about: ?project= / body.project, else the first one."""
+    name = request.args.get("project") or ((request.get_json(silent=True) or {}).get("project") if request.is_json else None)
+    if name:
+        if ".." in name or "/" in name or "\\" in name:
+            raise ValueError("bad project name")
+        d = ROOT / name
+        if _is_project(d):
+            return d
+        raise ValueError(f"no project {name!r}")
     projs = _projects()
-    if projs:
-        PROJECT = projs[0]
+    return projs[0] if projs else ROOT
 
 
 def _resolve(name: str) -> Path:
@@ -58,11 +67,11 @@ def _resolve(name: str) -> Path:
         p = p.with_suffix(".py")
     if p.is_absolute() or ".." in p.parts:
         raise ValueError("part names are relative to the project")
-    return PROJECT / p
+    return _project() / p
 
 
 def _out() -> Path:
-    o = PROJECT / "out"
+    o = _project() / "out"
     o.mkdir(exist_ok=True)
     return o
 
@@ -95,7 +104,8 @@ def _no_cache(resp):
 @app.get("/api/parts")
 def api_parts():
     rows = []
-    for p in sorted(PROJECT.glob("*.py")):
+    proj = _project()
+    for p in sorted(proj.glob("*.py")):
         if p.name.startswith("_"):
             continue
         row = {"name": p.stem, "file": p.name}
@@ -105,7 +115,7 @@ def api_parts():
         except Exception as e:
             row.update(doc=f"broken: {e}", ok=False)
         rows.append(row)
-    return jsonify({"project": str(PROJECT), "parts": rows})
+    return jsonify({"project": str(proj), "parts": rows})
 
 
 @app.get("/api/part/<name>")
@@ -223,24 +233,21 @@ def api_guide():
 
 @app.get("/api/projects")
 def api_projects():
-    return jsonify({"root": str(ROOT), "active": PROJECT.name if PROJECT != ROOT else "",
-                    "projects": [{"name": d.name, "parts": len(list(d.glob("*.py")))} for d in _projects()]})
+    projs = _projects()
+    return jsonify({"root": str(ROOT), "active": projs[0].name if projs else "",
+                    "projects": [{"name": d.name, "parts": len(list(d.glob("*.py")))} for d in projs]})
 
 
 @app.post("/api/projects/select")
 def api_project_select():
-    global PROJECT
     name = (request.json or {}).get("name", "")
-    d = ROOT / name
-    if not name or ".." in name or not _is_project(d):
+    if not name or ".." in name or not _is_project(ROOT / name):
         return jsonify({"error": f"no project {name!r}"}), 400
-    PROJECT = d
     return jsonify({"ok": True, "active": name})
 
 
 @app.post("/api/projects/new")
 def api_project_new():
-    global PROJECT
     data = request.json or {}
     name = "".join(c if c.isalnum() or c in "-_ " else "_" for c in data.get("name", "")).strip().replace(" ", "_")
     if not name:
@@ -253,7 +260,6 @@ def api_project_new():
     src = STARTERS / f"{starter}.py"
     first = d / f"{data.get('part') or starter}.py"
     first.write_text(src.read_text())
-    PROJECT = d
     return jsonify({"ok": True, "active": name, "part": first.stem})
 
 
@@ -299,12 +305,11 @@ def api_ai_poll(job_id):
 
 
 def serve(project: Path = Path("."), port: int = 8765, open_browser: bool = True):
-    global PROJECT, ROOT
+    global ROOT
     ROOT = Path(project).resolve()
-    PROJECT = ROOT
     _ensure_root()
     url = f"http://127.0.0.1:{port}"
-    print(f"forge: serving {PROJECT} at {url}")
+    print(f"forge: serving {ROOT} at {url}")
     if open_browser:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     # use_reloader restarts the server when forge's own code changes (after `git pull`)

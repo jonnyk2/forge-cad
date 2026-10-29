@@ -3,13 +3,16 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // ---------------------------------------------------------------- state
 const S = {
-  part: null, schema: null, params: {}, source: '', dirty: false,
+  project: null, part: null, schema: null, params: {}, source: '', dirty: false,
   mesh: null, edges: null, markers: [], bbox: null, violations: [],
   measuring: false, measurePts: [], buildTimer: null, building: false, queued: false,
 };
 const $ = (id) => document.getElementById(id);
 const status = (t, bad = false) => { $('status').textContent = t; $('status').style.color = bad ? 'var(--err)' : 'var(--muted)'; };
 const api = async (url, body) => {
+  // every request carries the tab's project, so several tabs never fight over one server-side setting
+  if (S.project && url.startsWith('/api/') && !url.startsWith('/api/projects')) url += (url.includes('?') ? '&' : '?') + 'project=' + encodeURIComponent(S.project);
+  if (body && S.project) body = { project: S.project, ...body };
   const r = await fetch(url, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
   const j = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
   if (!r.ok || j.error) throw Object.assign(new Error(j.error || `HTTP ${r.status}`), j);
@@ -265,17 +268,18 @@ async function loadProjects() {
   const sel = $('projectSel'); sel.innerHTML = '';
   for (const p of r.projects) { const o = document.createElement('option'); o.value = p.name; o.textContent = `${p.name} (${p.parts})`; sel.appendChild(o); }
   if (!r.projects.length) { const o = document.createElement('option'); o.textContent = '(no projects — click +)'; sel.appendChild(o); }
-  sel.value = r.active;
+  if (!S.project || !r.projects.some((p) => p.name === S.project)) S.project = r.active;
+  sel.value = S.project;
 }
 $('projectSel').onchange = async () => {
-  if (S.dirty && !confirm('Discard unsaved code changes?')) return;
-  try { await api('/api/projects/select', { name: $('projectSel').value }); S.part = null; await loadParts(); } catch (e) { alert(e.message); }
+  if (S.dirty && !confirm('Discard unsaved code changes?')) { $('projectSel').value = S.project; return; }
+  S.project = $('projectSel').value; S.part = null; await loadParts();
 };
 $('btnNewProject').onclick = () => { $('projName').value = ''; $('modalProject').classList.add('open'); $('projName').focus(); };
 $('projCancel').onclick = () => $('modalProject').classList.remove('open');
 $('projCreate').onclick = async () => {
   const name = $('projName').value.trim(); if (!name) return;
-  try { const r = await api('/api/projects/new', { name, starter: 'blank', part: 'part1' }); $('modalProject').classList.remove('open'); S.part = null; await loadProjects(); await loadParts(r.part); } catch (e) { alert(e.message); }
+  try { const r = await api('/api/projects/new', { name, starter: 'blank', part: 'part1' }); $('modalProject').classList.remove('open'); S.project = r.active; S.part = null; await loadProjects(); await loadParts(r.part); } catch (e) { alert(e.message); }
 };
 $('projName').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('projCreate').click(); });
 
@@ -322,7 +326,7 @@ $('exportClose').onclick = () => $('modalExport').classList.remove('open');
 document.querySelectorAll('#modalExport [data-fmt]').forEach((b) => (b.onclick = async () => {
   b.disabled = true; try {
     const r = await api('/api/export', { name: S.part, params: S.params, formats: [b.dataset.fmt] });
-    for (const [fmt, f] of Object.entries(r.files)) $('exportResult').innerHTML += `<div>✓ <a href="/out/${encodeURIComponent(f)}" style="color:var(--accent)">${f}</a></div>`;
+    for (const [fmt, f] of Object.entries(r.files)) $('exportResult').innerHTML += `<div>✓ <a href="/out/${encodeURIComponent(f)}?project=${encodeURIComponent(S.project)}" style="color:var(--accent)">${f}</a></div>`;
   } catch (e) { $('exportResult').innerHTML += `<div class="err">${esc(e.message)}</div>`; }
   b.disabled = false;
 }));
