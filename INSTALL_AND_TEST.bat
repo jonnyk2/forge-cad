@@ -27,7 +27,7 @@ python -m pip install -e . pytest >> test_results.txt 2>&1 || (
 echo [3/4] running kernel tests...
 echo. >> test_results.txt
 echo ---------------- pytest -m kernel -v ---------------- >> test_results.txt
-python -m pytest -m kernel -v --tb=short -rf --durations=6 -p no:cacheprovider >> test_results.txt 2>&1
+python -m pytest -m kernel -v --tb=short -rf --durations=6 -p no:cacheprovider --basetemp=.pytest_tmp >> test_results.txt 2>&1
 echo pytest exit code: %errorlevel% >> test_results.txt
 
 echo [4/4] building the phone stand starter...

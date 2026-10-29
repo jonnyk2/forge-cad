@@ -6,3 +6,4 @@ out/
 *.py.bak
 test_results.txt
 *.egg-info/
+.pytest_tmp/
