@@ -79,7 +79,17 @@ def _error(e: Exception, status=400):
 
 @app.get("/")
 def index():
-    return send_from_directory(app.static_folder, "index.html")
+    from .. import __version__
+    html = (HERE / "static" / "index.html").read_text(encoding="utf-8")
+    html = html.replace("/static/app.js", f"/static/app.js?v={__version__}")
+    return Response(html, mimetype="text/html")
+
+
+@app.after_request
+def _no_cache(resp):
+    # the app is local and changes often: never let the browser serve a stale script
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @app.get("/api/parts")
