@@ -87,6 +87,15 @@ class Job:
     def emit(self, kind: str, **data):
         with self._lock:
             self.events.append({"kind": kind, **data})
+        self._persist()
+
+    def _persist(self):
+        """Keep the job log on disk so a server restart (UPDATE.bat, auto-reload)
+        doesn't turn into a blank 'no such job'."""
+        try:
+            (self.out_dir / f"ai-{self.id}.json").write_text(json.dumps(self.snapshot(), default=str))
+        except Exception:
+            pass
 
     def snapshot(self, since: int = 0) -> dict:
         with self._lock:
@@ -177,6 +186,7 @@ class Job:
             self.error = f"{type(e).__name__}: {e}"
             self.emit("text", text=traceback.format_exc()[-800:])
         self.done = True
+        self._persist()
 
 
 def _tool_summary(name, inp) -> str:
@@ -190,6 +200,21 @@ def _tool_summary(name, inp) -> str:
 
 
 JOBS: dict[str, Job] = {}
+
+
+def snapshot_or_file(job_id: str, out_dir: Path, since: int = 0) -> Optional[dict]:
+    job = JOBS.get(job_id)
+    if job:
+        return job.snapshot(since)
+    f = out_dir / f"ai-{job_id}.json"
+    if not f.exists():
+        return None
+    snap = json.loads(f.read_text())
+    if not snap.get("done"):
+        snap["done"] = True
+        snap["error"] = "the server restarted while this request was running (an update?) — please send it again"
+    snap["events"] = snap["events"][since:]
+    return snap
 
 
 def start(part_path: Path, prompt: str, model: str, out_dir: Path) -> Job:

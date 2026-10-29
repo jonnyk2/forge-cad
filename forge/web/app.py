@@ -298,10 +298,10 @@ def api_ai_start():
 
 @app.get("/api/ai/<job_id>")
 def api_ai_poll(job_id):
-    job = ai.JOBS.get(job_id)
-    if not job:
+    snap = ai.snapshot_or_file(job_id, _out(), int(request.args.get("since", 0)))
+    if snap is None:
         return jsonify({"error": "no such job"}), 404
-    return jsonify(job.snapshot(int(request.args.get("since", 0))))
+    return jsonify(snap)
 
 
 def serve(project: Path = Path("."), port: int = 8765, open_browser: bool = True):
