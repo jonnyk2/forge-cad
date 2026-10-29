@@ -6,5 +6,5 @@ if exist .venv\Scripts\activate.bat (
   call .venv\Scripts\activate.bat
   python -m pip install -q -e . 2>nul
 )
-echo Up to date. Run RUN_APP.bat (or just refresh the browser if it's already running).
+echo Up to date. If the app is running, close its window and run RUN_APP.bat again.
 pause

@@ -312,6 +312,6 @@ def serve(project: Path = Path("."), port: int = 8765, open_browser: bool = True
     print(f"forge: serving {ROOT} at {url}")
     if open_browser:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
-    # use_reloader restarts the server when forge's own code changes (after `git pull`)
-    app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=True,
-            extra_files=[str(HERE / "static" / "index.html"), str(HERE / "static" / "app.js")])
+    # no auto-reloader: it restarts the server whenever a .py file it noticed changes,
+    # which includes part files being edited, and that kills in-flight AI jobs.
+    app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=False)
